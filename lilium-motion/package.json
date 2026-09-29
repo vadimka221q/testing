@@ -1,0 +1,12 @@
+{
+  "name": "lilium-motion",
+  "private": true,
+  "description": "LILIUM — procedural motion study (HTML/JS), rendered to MP4 with Playwright + ffmpeg",
+  "scripts": {
+    "render": "node render.cjs",
+    "render:720": "node render.cjs --scale 1 --out out/lilium-720.mp4"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

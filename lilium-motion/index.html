@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lilium Motion Study</title>
+<style>
+@font-face{font-family:'Archivo';src:url(fonts/archivo.woff2) format('woff2');font-weight:100 900;font-stretch:62% 125%;font-display:block}
+@font-face{font-family:'JB';src:url(fonts/jbmono.woff2) format('woff2');font-weight:400;font-display:block}
+:root{--paper:#F1EEF1;--red:#D71E28;--ink:#0A0A0A;--grid:#BEB9BF}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#141414;color:#eee;overflow:hidden;font-family:'Archivo',system-ui,sans-serif}
+#viewport{position:fixed;left:0;right:0;top:0;bottom:64px}
+#stage{position:absolute;left:0;top:0;width:1280px;height:720px;overflow:hidden;background:#000;transform-origin:0 0}
+body.render #viewport{bottom:0}
+body.render #bar{display:none}
+
+.scene{position:absolute;inset:0;display:none;overflow:hidden}
+.abs{position:absolute}
+.disp{font-family:'Archivo';font-weight:500;font-stretch:125%;font-variation-settings:'wdth' 125;line-height:1;white-space:nowrap;letter-spacing:-.01em}
+.mono{font-family:'JB',monospace}
+.ch{display:inline-block;will-change:transform}
+.lily{position:absolute;transform-origin:50% 50%}
+.lily svg{display:block;width:100%;height:100%}
+.lens{position:absolute;overflow:hidden}
+.h{position:absolute;width:7px;height:7px;background:#fff;border:1px solid #111;transform:translate(-50%,-50%)}
+.h.o{background:#fff}
+.h.o::after{content:'';position:absolute;left:1.5px;top:1.5px;width:2px;height:2px;background:#111}
+#fx{position:absolute;inset:0;pointer-events:none;z-index:50}
+
+/* S1 */
+#s1{background:var(--paper)}
+#s1 .cam{position:absolute;inset:0;transform-origin:640px 360px}
+#s1flash{position:absolute;inset:0;background:var(--red);display:none}
+.s1title{position:absolute;left:0;width:1280px;top:388px;text-align:center;font-size:104px;color:var(--ink);overflow:hidden;padding:4px 0 10px}
+.tag{position:absolute;left:475px;top:506px;height:19px;background:var(--red);color:#fff;font:9px/19px 'JB',monospace;padding:0 9px;letter-spacing:.02em;white-space:nowrap;overflow:hidden}
+.spec{position:absolute;left:838px;top:262px;font:6.2px/1.35 'JB',monospace;color:#222;white-space:pre}
+.sideLily{position:absolute}
+.sideLily svg{display:block;width:100%;height:100%}
+
+/* S2 */
+#s2{background:#000}
+.lensBox{position:absolute;border:1px solid rgba(255,255,255,.95)}
+.lensLbl{position:absolute;left:-1px;top:-19px;font-size:12px;color:#fff;font-family:'Archivo';font-stretch:110%;letter-spacing:.01em;white-space:nowrap}
+
+/* S3 */
+#s3{background:var(--red)}
+.card{position:absolute}
+.card .img{position:absolute;inset:0;overflow:hidden;background:#000}
+.card .img > div{position:absolute}
+.card .part svg{display:block;width:100%;height:100%}
+.card .lbl{position:absolute;left:-2px;top:-20px;font-size:12.5px;color:#fff;font-family:'Archivo';font-stretch:108%;white-space:nowrap}
+.bloomL{position:absolute;font-size:150px;color:#fff}
+
+/* S4 */
+#s4a{background:#000}
+#s4b{background:var(--paper)}
+.big{position:absolute;color:var(--red)}
+
+/* S5 */
+#s5{background:#000;background-image:radial-gradient(circle,#5a5a5a 1.1px,transparent 1.6px);background-size:64px 64px;background-position:22px 30px}
+.wordW{position:absolute;color:#fff;font-size:210px}
+#s5trace{position:absolute;inset:0;display:none;background:#050505;background-image:linear-gradient(#161616 1px,transparent 1px),linear-gradient(90deg,#161616 1px,transparent 1px);background-size:22px 22px}
+.tl{position:absolute;font:7.5px 'JB',monospace;color:#cfd3dc;letter-spacing:.04em;text-transform:uppercase}
+#s5flash{position:absolute;inset:0;display:none;background:var(--red)}
+
+/* S6 */
+#s6{background:#000}
+#s6 .cam{position:absolute;inset:0;transform-origin:640px 360px}
+.hr{position:absolute;width:9px;height:9px;background:var(--red);transform:translate(-50%,-50%)}
+
+/* UI */
+#bar{position:fixed;left:0;right:0;bottom:0;height:64px;display:flex;align-items:center;gap:14px;padding:0 20px;background:#0c0c0c;border-top:1px solid #222;font:12px 'JB',monospace;color:#aaa}
+#bar button{all:unset;cursor:pointer;width:34px;height:34px;display:grid;place-items:center;border:1px solid #333;border-radius:50%;color:#fff}
+#bar button:hover{border-color:var(--red)}
+#bar input{flex:1;accent-color:var(--red)}
+#bar .brand{color:#fff;letter-spacing:.08em}
+</style>
+</head>
+<body>
+<div id="viewport"><div id="stage">
+  <div class="scene" id="s1"><div class="cam"></div><div id="s1flash"></div></div>
+  <div class="scene" id="s2"></div>
+  <div class="scene" id="s3"></div>
+  <div class="scene" id="s4a"></div>
+  <div class="scene" id="s4b"></div>
+  <div class="scene" id="s5"></div>
+  <div class="scene" id="s6"><div class="cam"></div></div>
+  <canvas id="fx" width="1280" height="720"></canvas>
+</div></div>
+<div id="bar">
+  <button id="play" aria-label="Play / pause">❚❚</button>
+  <span id="time">0.00s</span>
+  <input id="scrub" type="range" min="0" max="1" step="0.0001" value="0" aria-label="Timeline">
+  <span class="brand">LILIUM · SPECIMEN_01</span>
+</div>
+<script>
+/* ============================================================
+   LILIUM — motion study
+   Everything is a pure function of time: render(t).
+   Preview: open in a browser.  Render: node render.cjs
+   ============================================================ */
+const W=1280,H=720,FPS=30,DUR=7.8;
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const P=(t,a,b)=>clamp((t-a)/(b-a));
+const E={
+  outExpo:x=>x>=1?1:1-Math.pow(2,-10*x),
+  inExpo:x=>x<=0?0:Math.pow(2,10*x-10),
+  inOutExpo:x=>x<=0?0:x>=1?1:x<.5?Math.pow(2,20*x-10)/2:(2-Math.pow(2,-20*x+10))/2,
+  outCubic:x=>1-Math.pow(1-x,3),
+  inCubic:x=>x*x*x,
+  inOutCubic:x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2,
+  outQuart:x=>1-Math.pow(1-x,4),
+  outBack:x=>{const c1=1.9,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)},
+};
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hash(a,b=0,c=0){let h=Math.imul((a|0)^0x9e3779b9,0x85ebca6b)^Math.imul((b|0)+0x632be5ab,0xc2b2ae35)^Math.imul((c|0)+0x27d4eb2f,0x165667b1);h^=h>>>15;h=Math.imul(h,0x2c1b3c6d);h^=h>>>12;h=Math.imul(h,0x297a2d39);h^=h>>>15;return (h>>>0)/4294967296}
+function vnoise(x,y,s){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const a=hash(xi,yi,s),b=hash(xi+1,yi,s),c=hash(xi,yi+1,s),d=hash(xi+1,yi+1,s);return lerp(lerp(a,b,u),lerp(c,d,u),v)}
+const $=(sel,root=document)=>root.querySelector(sel);
+const $$=(sel,root=document)=>[...root.querySelectorAll(sel)];
+function el(tag,cls,parent,html){const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;if(parent)parent.appendChild(e);return e}
+function place(e,x,y,w,h){const s=e.style;s.left=x+'px';s.top=y+'px';if(w!=null)s.width=w+'px';if(h!=null)s.height=h+'px'}
+function show(e,on){e.style.display=on?'block':'none'}
+function letters(e){const txt=e.textContent;e.textContent='';return [...txt].map(c=>el('span','ch',e,c===' '?'&nbsp;':c))}
+
+/* ---------------- procedural lily ---------------- */
+const fx2=v=>Math.round(v*100)/100;
+function smoothPath(pts,closed=true){
+  const n=pts.length;let d=`M${fx2(pts[0][0])} ${fx2(pts[0][1])}`;
+  const g=i=>closed?pts[(i+n)%n]:pts[Math.max(0,Math.min(n-1,i))];
+  for(let i=0;i<(closed?n:n-1);i++){const p0=g(i-1),p1=g(i),p2=g(i+1),p3=g(i+2);
+    d+=`C${fx2(p1[0]+(p2[0]-p0[0])/6)} ${fx2(p1[1]+(p2[1]-p0[1])/6)} ${fx2(p2[0]-(p3[0]-p1[0])/6)} ${fx2(p2[1]-(p3[1]-p1[1])/6)} ${fx2(p2[0])} ${fx2(p2[1])}`}
+  return closed?d+'Z':d;
+}
+// A petal grown along a curling midline. Base at (0,0), pointing up (-y).
+function petal({L=100,W=30,curl=0,bend=0,steps=44,ruffle=.04,seed=1,shape=.75,pinch=.85}){
+  const r=rng(seed),ph=r()*6.28,fr=16+r()*12;
+  let x=0,y=0;const mid=[],L1=[],R1=[],ws=[],phis=[];const ds=L/steps;
+  for(let i=0;i<=steps;i++){const s=i/steps,phi=bend*s+curl*s*s;
+    if(i>0){x+=Math.sin(phi)*ds;y-=Math.cos(phi)*ds}
+    let w=W*Math.pow(Math.sin(Math.PI*Math.pow(s,shape)),pinch);w*=1+ruffle*Math.sin(s*fr+ph)*s;
+    const nx=Math.cos(phi),ny=Math.sin(phi);mid.push([x,y]);ws.push(w);phis.push(phi);
+    L1.push([x-nx*w/2,y-ny*w/2]);R1.push([x+nx*w/2,y+ny*w/2])}
+  const at=(s,u)=>{const i=Math.round(s*steps),m=mid[i],w=ws[i],ph=phis[i];return [m[0]+Math.cos(ph)*u*w,m[1]+Math.sin(ph)*u*w]};
+  return {d:smoothPath([...L1,...R1.slice(1,-1).reverse()]),mid,at,tip:[x,y]};
+}
+const PAL={
+  red:{g:['#2b0007','#7a0916','#c9172a','#e92d38','#ff6b5d'],shadeD:'rgba(35,0,6,.55)',shadeL:'rgba(255,214,204,.30)',edge:'rgba(70,0,12,.35)',rib:'rgba(255,205,195,.22)',vein:'rgba(90,0,14,.16)',spot:'#5a0511',throat:'#c7c64a',fil:'#e5d9a0',anth:'#46130a',anthHi:'#c65a1f',stig:'#6a0b19',stemA:'#355d1a',stemB:'#86ab3d',bud:['#3a5a16','#8f9a2e','#c4492a','#dd3a2e']},
+  blue:{g:['#020a3c','#0c2da3','#2f7ee9','#8fc4ff','#f5faff'],shadeD:'rgba(0,12,70,.5)',shadeL:'rgba(255,255,255,.38)',edge:'rgba(0,20,90,.28)',rib:'rgba(255,255,255,.6)',vein:'rgba(255,255,255,.22)',spot:'#0a247d',throat:'#ffffff',fil:'#dcecff',anth:'#0a1a72',anthHi:'#6aa3ff',stig:'#0b2b8c',stemA:'#8fbfff',stemB:'#f2f8ff'},
+  xray:{g:['rgba(255,255,255,.02)','rgba(200,215,255,.05)','rgba(210,225,255,.13)','rgba(225,235,255,.28)','rgba(240,246,255,.5)'],shadeD:'rgba(0,0,0,0)',shadeL:'rgba(255,255,255,.2)',edge:'rgba(236,242,255,.78)',rib:'rgba(255,255,255,.55)',vein:'rgba(230,238,255,.35)',spot:null,throat:'rgba(255,255,255,.35)',fil:'rgba(255,255,255,.6)',anth:'rgba(255,255,255,.12)',anthHi:'rgba(255,255,255,.85)',stig:'rgba(255,255,255,.45)',stemA:'rgba(255,255,255,.4)',stemB:'rgba(255,255,255,.7)'},
+};
+let UID=0;
+function petalDefs(id,p){
+  return `<radialGradient id="${id}r" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="112">${p.g.map((c,i)=>`<stop offset="${[0,.15,.42,.76,1][i]}" stop-color="${c}"/>`).join('')}</radialGradient>
+  <linearGradient id="${id}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${p.shadeD}"/><stop offset=".42" stop-color="${p.shadeD}" stop-opacity="0"/><stop offset=".6" stop-color="${p.shadeL}" stop-opacity="0"/><stop offset="1" stop-color="${p.shadeL}"/></linearGradient>
+  <linearGradient id="${id}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.shadeD}"/><stop offset=".3" stop-color="${p.shadeD}" stop-opacity="0"/></linearGradient>
+  <linearGradient id="${id}h" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${p.throat}" stop-opacity=".95"/><stop offset="1" stop-color="${p.throat}" stop-opacity="0"/></linearGradient>`;
+}
+function petalMarkup(id,p,pt,{spots=0,r,veins=true,throat=null}){
+  let s=`<path d="${pt.d}" fill="url(#${id}r)" stroke="${p.edge}" stroke-width=".6"/><path d="${pt.d}" fill="url(#${id}s)"/><path d="${pt.d}" fill="url(#${id}t)"/>`;
+  if(throat)s+=`<path d="${throat.d}" fill="url(#${id}h)"/>`;
+  if(veins)for(const u of [-.34,-.18,.18,.34]){const pts=[];for(let k=.06;k<=.86;k+=.08)pts.push(pt.at(k,u*(1-k*.3)));s+=`<path d="${smoothPath(pts,false)}" fill="none" stroke="${p.vein}" stroke-width=".55"/>`}
+  s+=`<path d="${smoothPath(pt.mid.slice(1,-5),false)}" fill="none" stroke="${p.rib}" stroke-width="1.1" stroke-linecap="round"/>`;
+  if(p.spot)for(let k=0;k<spots;k++){const q=pt.at(.1+r()*.38,(r()-.5)*.62);s+=`<circle cx="${fx2(q[0])}" cy="${fx2(q[1])}" r="${fx2(.45+r()*1)}" fill="${p.spot}" opacity="${fx2(.45+r()*.45)}"/>`}
+  return s;
+}
+// Top-down lily: 6 tepals, stamens, pistil.
+function lilySVG(o={}){
+  const {pal='red',seed=7,vb='-118 -118 236 236',bg=null,stamens=true,wh=''}=o;
+  const p=PAL[pal],id='L'+(UID++),r=rng(seed*97+3);
+  let g='';
+  for(const i of [0,2,4,1,3,5]){
+    const outer=i%2===0,ang=i*60+15+(r()*10-5);
+    const curl=(r()-.5)*.55,bend=(r()-.5)*.22;
+    const pt=petal({L:outer?106:98,W:outer?44:58,curl,bend,seed:seed*13+i,shape:outer?.78:.66,pinch:.7,ruffle:outer?.035:.07});
+    const th=petal({L:46,W:outer?7:10,curl:curl*.2,bend:bend*.45,seed:2,ruffle:0});
+    g+=`<g transform="rotate(${fx2(ang)})">${petalMarkup(id,p,pt,{spots:outer?9:20,r,throat:th})}</g>`;
+  }
+  g+=`<circle r="22" fill="url(#${id}c)"/>`;
+  if(stamens){
+    for(let k=0;k<6;k++){const a=(k*60+45+r()*16)*Math.PI/180,len=50+r()*11,ex=Math.cos(a)*len,ey=Math.sin(a)*len,cx=Math.cos(a+.38)*len*.52,cy=Math.sin(a+.38)*len*.52;
+      g+=`<path d="M0 0Q${fx2(cx)} ${fx2(cy)} ${fx2(ex)} ${fx2(ey)}" fill="none" stroke="${p.fil}" stroke-width="1.5" stroke-linecap="round"/>`;
+      g+=`<ellipse cx="${fx2(ex)}" cy="${fx2(ey)}" rx="7.2" ry="2.4" transform="rotate(${fx2(a*180/Math.PI+90)} ${fx2(ex)} ${fx2(ey)})" fill="${p.anth}" stroke="${p.anthHi}" stroke-width=".7"/>`;
+      for(let q=0;q<4;q++)g+=`<circle cx="${fx2(ex+(r()-.5)*7)}" cy="${fx2(ey+(r()-.5)*7)}" r=".7" fill="${p.anthHi}"/>`}
+    const a=r()*6.28,ex=Math.cos(a)*42,ey=Math.sin(a)*42;
+    g+=`<path d="M0 0Q${fx2(ex*.4+6)} ${fx2(ey*.4-4)} ${fx2(ex)} ${fx2(ey)}" fill="none" stroke="${p.fil}" stroke-width="2.3" stroke-linecap="round"/>`;
+    for(let q=0;q<3;q++){const b=a+q*2.09;g+=`<circle cx="${fx2(ex+Math.cos(b)*2.4)}" cy="${fx2(ey+Math.sin(b)*2.4)}" r="2.7" fill="${p.stig}"/>`}
+  }
+  const defs=petalDefs(id,p)+`<radialGradient id="${id}c"><stop offset="0" stop-color="#000" stop-opacity="${pal==='xray'?0:.5}"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" preserveAspectRatio="xMidYMid slice" ${wh}>${bg?`<rect x="-999" y="-999" width="2000" height="2000" fill="${bg}"/>`:''}<defs>${defs}</defs>${g}</svg>`;
+}
+// Side view lily on a stem (S1 specimen)
+function sideLilySVG({pal='red',seed=3}={}){
+  const p=PAL[pal],id='L'+(UID++),r=rng(seed);const cx=100,cy=122;
+  const pet=(a,L,Wd,curl,dark,sd)=>{const pt=petal({L,W:Wd,curl,seed:sd,shape:.72,ruffle:.05});
+    return `<g transform="translate(${cx} ${cy}) rotate(${a})"><path d="${pt.d}" fill="url(#${id}v)" stroke="${p.edge}" stroke-width=".5"/><path d="${pt.d}" fill="url(#${id}s)"/>${dark?`<path d="${pt.d}" fill="#000" opacity="${dark}"/>`:''}<path d="${smoothPath(pt.mid.slice(1,-6),false)}" fill="none" stroke="${p.rib}" stroke-width=".8"/></g>`};
+  let g=`<path d="M100 120C97 175 107 250 101 380" fill="none" stroke="url(#${id}st)" stroke-width="3.4" stroke-linecap="round"/>`;
+  g+=`<path d="M102 232q9-6 13-16M100 300q-8-5-11-14" fill="none" stroke="url(#${id}st)" stroke-width="1.6" stroke-linecap="round"/>`;
+  g+=pet(-30,68,21,-1.1,.42,11)+pet(28,70,21,1.1,.42,12)+pet(3,64,23,.25,.3,13);
+  for(let k=0;k<6;k++){const dx=-30+k*12+(r()-.5)*6,ty=cy-58-r()*14;g+=`<path d="M${cx} ${cy}Q${cx+dx*.3} ${cy-30} ${fx2(cx+dx)} ${fx2(ty)}" fill="none" stroke="${p.fil}" stroke-width="1.1"/><ellipse cx="${fx2(cx+dx)}" cy="${fx2(ty)}" rx="5" ry="1.9" transform="rotate(${fx2(dx*1.2)} ${fx2(cx+dx)} ${fx2(ty)})" fill="${p.anth}" stroke="${p.anthHi}" stroke-width=".5"/>`}
+  g+=`<path d="M${cx} ${cy}Q${cx+4} ${cy-40} ${cx+2} ${cy-74}" fill="none" stroke="${p.fil}" stroke-width="1.8"/><circle cx="${cx+2}" cy="${cy-75}" r="2.6" fill="${p.stig}"/>`;
+  g+=pet(-64,74,25,-1.5,0,14)+pet(62,76,25,1.6,0,15)+pet(-4,50,27,-.4,.05,16);
+  g+=`<ellipse cx="${cx}" cy="${cy+2}" rx="5" ry="3.5" fill="${p.stemA}"/>`;
+  const defs=petalDefs(id,p)+`<linearGradient id="${id}v" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${p.g[1]}"/><stop offset=".25" stop-color="${p.g[2]}"/><stop offset=".7" stop-color="${p.g[3]}"/><stop offset="1" stop-color="${p.g[4]}"/></linearGradient>
+  <linearGradient id="${id}st" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.stemA}"/><stop offset=".5" stop-color="${p.stemB}"/><stop offset="1" stop-color="${p.stemA}"/></linearGradient>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 380"><defs>${defs}</defs>${g}</svg>`;
+}
+/* close-up "photo" crops for the anatomy cards */
+function partSVG(kind){
+  const p=PAL.red,id='P'+(UID++);let g='',defs=petalDefs(id,p);
+  const wrap=(inner)=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="#050505"/><defs>${defs}</defs>${inner}</svg>`;
+  if(kind==='bud'){
+    const pt=petal({L:96,W:31,shape:.5,pinch:.7,curl:.15,seed:4,ruffle:0});
+    defs+=`<linearGradient id="${id}b" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#2f4a12"/><stop offset=".35" stop-color="#8d9a2c"/><stop offset=".7" stop-color="#c8502a"/><stop offset="1" stop-color="#e0392d"/></linearGradient>`;
+    g=`<path d="M8 104 Q16 94 24 88" stroke="#3d5a18" stroke-width="5" fill="none"/><g transform="translate(22 90) rotate(40)"><path d="${pt.d}" fill="url(#${id}b)"/><path d="${pt.d}" fill="url(#${id}s)"/>`;
+    for(const u of [-.3,-.08,.16,.36]){const pts=[];for(let k=.04;k<=.97;k+=.07)pts.push(pt.at(k,u*(1-k*.6)));g+=`<path d="${smoothPath(pts,false)}" fill="none" stroke="rgba(25,35,5,.45)" stroke-width=".8"/>`}
+    g+=`<path d="${smoothPath([pt.at(.08,.26),pt.at(.4,.28),pt.at(.8,.18)],false)}" fill="none" stroke="rgba(255,240,190,.45)" stroke-width="1.2"/></g>`;
+  }else if(kind==='tepal'){
+    const pt=petal({L:175,W:88,curl:1.1,bend:.2,seed:9,shape:.65,ruffle:.05});
+    g=`<g transform="translate(6 128) rotate(12) scale(1.02)">${petalMarkup(id,p,pt,{spots:30,r:rng(5)})}</g>`;
+    g=g.replace(`url(#${id}r)`,`url(#${id}g)`);
+    defs+=`<linearGradient id="${id}g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#5c0512"/><stop offset=".45" stop-color="#c3172a"/><stop offset=".8" stop-color="#ee3a3e"/><stop offset="1" stop-color="#ff7a68"/></linearGradient>`;
+  }else if(kind==='stigma'){
+    const rr=rng(21);
+    defs+=`<radialGradient id="${id}k" cx=".38" cy=".32" r=".75"><stop offset="0" stop-color="#e2667a"/><stop offset=".45" stop-color="#9d1730"/><stop offset="1" stop-color="#3c0511"/></radialGradient>`;
+    const lobes=[[40,44,22],[62,40,21],[53,62,21]];
+    g=`<path d="M-10 110 Q20 60 -10 10 L-10 110Z" fill="#8a0d1d"/><path d="M110 70 Q80 90 90 110 L110 110Z" fill="#a8121f"/><path d="M52 118 Q54 90 53 74" stroke="#c9c07a" stroke-width="12" fill="none"/>`;
+    for(const [x,y,R] of lobes)g+=`<circle cx="${x}" cy="${y}" r="${R}" fill="url(#${id}k)"/>`;
+    for(let k=0;k<420;k++){const L=lobes[k%3],a=rr()*6.28,d=Math.sqrt(rr())*(L[2]-1.2);g+=`<circle cx="${fx2(L[0]+Math.cos(a)*d)}" cy="${fx2(L[1]+Math.sin(a)*d)}" r="${fx2(.5+rr()*.6)}" fill="rgba(255,175,185,${fx2(.18+rr()*.3)})"/>`}
+  }else if(kind==='stamen'){
+    const rr=rng(33);
+    defs+=`<linearGradient id="${id}f" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#d8742a"/><stop offset="1" stop-color="#f4cf62"/></linearGradient>`;
+    const pt=petal({L:140,W:60,curl:-.6,seed:3,shape:.7});
+    g=`<g transform="translate(-6 118) rotate(20)">${petalMarkup(id,p,pt,{spots:18,r:rr})}</g>`;
+    for(let k=0;k<6;k++){const x0=34+k*9,x1=18+k*15+(rr()-.5)*6,y1=16+rr()*30;
+      g+=`<path d="M${x0} 110Q${x0+4} 60 ${fx2(x1)} ${fx2(y1)}" fill="none" stroke="url(#${id}f)" stroke-width="2"/>`;
+      g+=`<ellipse cx="${fx2(x1)}" cy="${fx2(y1)}" rx="3.2" ry="10" transform="rotate(${fx2((rr()-.5)*40)} ${fx2(x1)} ${fx2(y1)})" fill="#6a230c" stroke="#d2701f" stroke-width=".8"/>`;
+      for(let q=0;q<6;q++)g+=`<circle cx="${fx2(x1+(rr()-.5)*6)}" cy="${fx2(y1+(rr()-.5)*16)}" r=".8" fill="#f09a2c"/>`}
+  }else if(kind==='receptacle'){
+    const rr=rng(44);
+    defs+=`<linearGradient id="${id}q" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#4b7a1c"/><stop offset=".6" stop-color="#b9c24a"/><stop offset="1" stop-color="#e6d767" stop-opacity=".2"/></linearGradient>`;
+    const a=petal({L:130,W:60,curl:-.9,seed:5}),b=petal({L:130,W:60,curl:.9,seed:6});
+    g=`<g transform="translate(46 112) rotate(-32)">${petalMarkup(id,p,a,{spots:14,r:rr})}</g><g transform="translate(54 112) rotate(34)">${petalMarkup(id,p,b,{spots:14,r:rr})}</g>`;
+    for(let k=0;k<7;k++){const s=petal({L:92+rr()*10,W:7,seed:k+9,ruffle:0});g+=`<g transform="translate(50 112) rotate(${-27+k*9})"><path d="${s.d}" fill="url(#${id}q)"/></g>`}
+    for(let k=0;k<5;k++){const x=30+k*10;g+=`<path d="M50 104Q${x} 50 ${x-4+rr()*8} ${10+rr()*16}" stroke="#d9b24a" stroke-width="1.2" fill="none"/>`}
+  }
+  return wrap(g);
+}
+
+/* ---------------- raster of the lily for pixel effects ---------------- */
+let LILY_PX=null;
+function buildRaster(){
+  return new Promise(res=>{const N=56,img=new Image();
+    img.onload=()=>{const c=document.createElement('canvas');c.width=c.height=N;const x=c.getContext('2d');x.drawImage(img,0,0,N,N);
+      const d=x.getImageData(0,0,N,N).data,cells=[];for(let j=0;j<N;j++)for(let i=0;i<N;i++){const a=d[(j*N+i)*4+3];if(a>90)cells.push([i,j])}
+      LILY_PX={N,cells};res()};
+    img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(lilySVG({pal:'red',seed:7,wh:'width="56" height="56"'}))});
+}
+function pixelLily(ctx,cx,cy,size,{color='#fff',p=1,squash=1,gap=.14,seed=1,jitter=0,t=0,alt=null}={}){
+  if(!LILY_PX)return;const {N,cells}=LILY_PX,cs=size/N,fr=Math.floor(t*30);
+  for(let k=0;k<cells.length;k++){const [i,j]=cells[k];if(hash(i,j,seed)>p)continue;
+    let x=cx-size/2+i*cs,y=cy+(j*cs-size/2)*squash;
+    if(jitter&&hash(j,fr,seed)<.25)x+=(hash(i,j,fr)-.5)*jitter;
+    ctx.fillStyle=alt&&hash(i,j,seed+7)<.3?alt:color;
+    ctx.fillRect(x,y,cs*(1-gap),cs*squash*(1-gap))}
+}
+function pixelWipe(ctx,p,{cell=16,seed=1,mode='white',exclude=[]}={}){
+  if(p<=0)return;
+  for(let y=0;y<H;y+=cell)for(let x=0;x<W;x+=cell){
+    const cxn=x/cell,cyn=y/cell;
+    const v=vnoise(cxn*.11,cyn*.11,seed)*.72+hash(cxn,cyn,seed)*.28;
+    if(v>p*1.08)continue;
+    if(exclude.some(r=>x+cell>r.x&&x<r.x+r.w&&y+cell>r.y&&y<r.y+r.h))continue;
+    if(mode==='red'){ctx.fillStyle='#D71E28';ctx.fillRect(x,y,cell,cell);continue}
+    const q=vnoise(cxn*.23,cyn*.23,seed+9);
+    if(q<.42){ctx.fillStyle='#fff';ctx.fillRect(x,y,cell,cell);ctx.fillStyle='#111';ctx.fillRect(x,y+4,cell,1.6);ctx.fillRect(x,y+10,cell,1.6)}
+    else if(q<.62){ctx.fillStyle='#000';ctx.fillRect(x,y,cell,cell);ctx.fillStyle='#fff';for(let a=0;a<2;a++)for(let b=0;b<2;b++)ctx.fillRect(x+3+a*8,y+3+b*8,2.6,2.6)}
+    else{ctx.fillStyle='#fff';ctx.fillRect(x,y,cell,cell)}
+  }
+}
+
+/* ============================ BUILD ============================ */
+const S={};
+const lilyEl=(parent,html,x,y,size,cls='lily')=>{const e=el('div',cls,parent,html);place(e,x,y,size,size);return e};
+function lilyXform(e,rot,sc){e.style.transform=`rotate(${rot}deg) scale(${sc})`}
+
+function buildS1(){
+  const cam=$('#s1 .cam');
+  const X0=475,X1=805,Y0=195,Y1=525,CX=640,CY=360;
+  let svg=`<svg class="abs" width="1280" height="720" style="left:0;top:0;overflow:visible">`;
+  const ln=(x1,y1,x2,y2,c,o='')=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="1" ${o}/>`;
+  svg+=`<g class="gl" style="transform-origin:640px 195px">${ln(-200,Y0,1480,Y0,'#b7b2b8')}</g><g class="gl" style="transform-origin:640px 525px">${ln(-200,Y1,1480,Y1,'#b7b2b8')}</g>`;
+  svg+=`<g class="gv" style="transform-origin:475px 360px">${ln(X0,-200,X0,920,'#b7b2b8')}</g><g class="gv" style="transform-origin:805px 360px">${ln(X1,-200,X1,920,'#b7b2b8')}</g>`;
+  svg+=`<g class="gv" style="transform-origin:150px 360px">${ln(150,-200,150,920,'#d7d2d8')}</g><g class="gv" style="transform-origin:1130px 360px">${ln(1130,-200,1130,920,'#d7d2d8')}</g>`;
+  svg+=`<g class="circ" style="transform-origin:640px 360px"><circle cx="${CX}" cy="${CY}" r="165" fill="none" stroke="#9d989e" stroke-width=".9" stroke-dasharray="3 4"/></g>`;
+  svg+=`<g class="diag">${ln(X0,Y0,X1,Y1,'#a9a4aa','stroke-dasharray="3 4"')}${ln(X1,Y0,X0,Y1,'#a9a4aa','stroke-dasharray="3 4"')}</g>`;
+  for(const [x,y] of [[X0,Y0],[X1,Y0],[X0,Y1],[X1,Y1],[CX,CY],[CX,Y0],[X1,CY]])svg+=`<rect class="node" x="${x-4}" y="${y-4}" width="8" height="8" fill="#D71E28" style="transform-origin:${x}px ${y}px"/>`;
+  svg+=`</svg>`;
+  cam.insertAdjacentHTML('beforeend',svg);
+  S.s1={cam,gl:$$('.gl',cam),gv:$$('.gv',cam),circ:$('.circ',cam),diag:$('.diag',cam),nodes:$$('.node',cam)};
+  const L=el('div','sideLily',cam,sideLilySVG({pal:'red'}));place(L,540,150,200,380);S.s1.lily=L;
+  const lens=el('div','lens',cam);lens.style.background='#050505';S.s1.lens=lens;
+  const L2=el('div','sideLily',lens,sideLilySVG({pal:'blue'}));place(L2,0,0,200,380);S.s1.lily2=L2;
+  const title=el('div','disp s1title',cam,'LILIUM');S.s1.title=title;S.s1.tch=letters(title);
+  const tag=el('div','tag',cam,'SPECIMEN_01');S.s1.tag=tag;
+  S.s1.specTxt='SPECIMEN: LILIUM-01\nTYPE: RED LILY\nSTATE: EARLY BLOOM\nPETAL FORM: OPEN / CURVED\nSTEM ANGLE: 18°\nSURFACE: ORGANIC\nCAPTURE: FRONT STUDY';
+  S.s1.spec=el('div','spec',cam,'');
+}
+const S2L={x:65,y:-145,size:1150};
+function s2Lily(t){const p=P(t,1.35,2.5);return {rot:lerp(-16,-3,E.outCubic(p)),sc:lerp(1.14,1.0,E.outCubic(p))}}
+const LENS=[{x:306,y:170,w:180,h:250,n:'Surface_01',t:1.52},{x:580,y:136,w:264,h:164,n:'Surface_02',t:1.6},{x:640,y:472,w:160,h:164,n:'Surface_03',t:1.76},{x:912,y:200,w:252,h:130,n:'Surface_04',t:1.68}];
+function buildS2(){
+  const s=$('#s2');
+  const big=lilyEl(s,lilySVG({pal:'red',seed:7}),S2L.x,S2L.y,S2L.size);
+  const lenses=LENS.map(L=>{const lens=el('div','lens',s);const inner=lilyEl(lens,lilySVG({pal:'blue',seed:7}),0,0,S2L.size);
+    const box=el('div','lensBox',s);el('div','lensLbl',box,L.n);
+    const hs=[0,1,2,3].map(i=>el('div','h',box));hs[0].style.cssText='left:0;top:0';hs[1].style.cssText='left:100%;top:0';hs[2].style.cssText='left:0;top:100%';hs[3].style.cssText='left:100%;top:100%';
+    return {lens,inner,box,L}});
+  const r=rng(77);
+  S.s2={s,big,lenses,
+    boxes:Array.from({length:34},(_,i)=>({x:120+r()*1040,y:30+r()*640,w:16+r()*80,h:10+r()*34,a:1.36+r()*.5,d:.25+r()*.5,lab:r()<.45,v:r()})),
+    parts:Array.from({length:220},()=>({a:r()*6.28,d:60+Math.pow(r(),.7)*470,s:.8+r()*1.6,k:r()}))};
+}
+const CARDS=[
+  {n:'Bud',kind:'bud',from:0},{n:'Tepal',kind:'tepal',from:1},{n:'Stigma',kind:'stigma',from:2},{n:'Stamen',kind:'stamen',from:3},{n:'Receptacle.',kind:'receptacle',from:-1}];
+const LAY_A=[{x:226,y:240,w:188,h:186},{x:392,y:262,w:204,h:188},{x:596,y:300,w:168,h:196},{x:762,y:282,w:158,h:228},{x:918,y:252,w:152,h:222}];
+const LAY_B=[{x:250,y:292,w:150,h:162},{x:384,y:262,w:176,h:172},{x:530,y:246,w:166,h:190},{x:676,y:258,w:156,h:196},{x:808,y:236,w:176,h:176}];
+const BLOOM=[{c:'B',x:376,y:300,t:3.46},{c:'L',x:497,y:300,t:3.54},{c:'O',x:598,y:222,t:3.62},{c:'O',x:752,y:296,t:3.72},{c:'M',x:906,y:318,t:3.84}];
+function buildS3(){
+  const s=$('#s3');
+  s.insertAdjacentHTML('beforeend',`<svg class="abs guides" width="1280" height="720" style="left:0;top:0">
+    <line x1="0" y1="240" x2="1280" y2="240" stroke="rgba(255,255,255,.55)" stroke-dasharray="5 5"/>
+    <line x1="0" y1="538" x2="1280" y2="538" stroke="rgba(255,255,255,.55)" stroke-dasharray="5 5"/>
+    <line x1="226" y1="0" x2="226" y2="720" stroke="rgba(255,255,255,.55)" stroke-dasharray="5 5"/>
+    <line x1="1070" y1="0" x2="1070" y2="720" stroke="rgba(255,255,255,.55)" stroke-dasharray="5 5"/></svg>
+    <svg class="abs arcs" width="1280" height="720" style="left:0;top:0;overflow:visible">${'<path fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1"/>'.repeat(6)}</svg>`);
+  const cards=CARDS.map((c,k)=>{const e=el('div','card',s);e.style.zIndex=10+k;const img=el('div','img',e);
+    const blue=el('div','',img);blue.style.cssText='inset:0';const bl=lilyEl(blue,lilySVG({pal:'blue',seed:7}),0,0,S2L.size);
+    const part=el('div','part',img,partSVG(c.kind));part.style.cssText='inset:0';
+    const lbl=el('div','lbl',e,'');
+    const hs=['o','','o',''].map(m=>el('div','h '+m,e));
+    return {e,img,blue,bl,part,lbl,hs,c}});
+  S.s3={s,cards,guides:$('.guides',s),arcs:$$('.arcs path',s),letters:BLOOM.map(b=>{const e=el('div','disp bloomL',s,b.c);e.style.zIndex=30;place(e,b.x,b.y);return e})};
+}
+function buildS4(){
+  const a=$('#s4a');const t=el('div','disp big',a,'IN BLOOM');t.style.fontSize='150px';t.style.left='0';t.style.width='1280px';t.style.textAlign='center';t.style.top='282px';
+  S.s4a={t,ch:letters(t)};
+  const b=$('#s4b');const row=el('div','disp big',b,'IN BLOOM&nbsp; BLOOM&nbsp; BLOOM&nbsp; BLOOM');row.style.fontSize='120px';row.style.top='300px';row.style.left='0';row.style.transformOrigin='0 50%';
+  S.s4b={row};
+}
+const S5L={x:380,y:140,size:520};
+function buildS5(){
+  const s=$('#s5');
+  const top=el('div','disp wordW',s,'LIVING');top.style.top='26px';
+  const bot=el('div','disp wordW',s,'GEOMETRY');bot.style.top='452px';
+  const ghosts=[0,1,2].map(()=>{const g=lilyEl(s,lilySVG({pal:'red',seed:11}),S5L.x,S5L.y,S5L.size);g.style.filter='blur(2px)';return g});
+  const lily=lilyEl(s,lilySVG({pal:'red',seed:11}),S5L.x,S5L.y,S5L.size);
+  const lens=el('div','lens',s);const lensL=lilyEl(lens,lilySVG({pal:'blue',seed:11}),0,0,S5L.size);
+  const trace=el('div','',s);trace.id='s5trace';
+  const tl=lilyEl(trace,lilySVG({pal:'blue',seed:11}),400,120,480);
+  trace.insertAdjacentHTML('beforeend',`<svg class="abs" width="1280" height="720" style="left:0;top:0"><circle class="tc" cx="640" cy="360" r="206" fill="none" stroke="rgba(255,255,255,.75)" stroke-width="1" stroke-dasharray="1300" stroke-dashoffset="1300" transform="rotate(-90 640 360)"/>
+    <g class="tp">${[0,1,2,3,4,5].map(i=>{const a=(i*60+15-8)*Math.PI/180;return `<rect x="${640+Math.cos(a)*206-3}" y="${360+Math.sin(a)*206-3}" width="6" height="6" fill="#050505" stroke="#fff"/>`}).join('')}</g></svg>
+    <div class="tl" style="left:36px;top:28px">LILIUM</div><div class="tl" style="right:36px;top:28px">SPECIMEN_01</div>
+    <div class="tl" style="left:120px;top:180px;font-size:11px;letter-spacing:.02em">GEOMETRIC TRACE</div>
+    <div class="tl" style="left:36px;bottom:26px">FLORAL STUDY</div><div class="tl" style="right:36px;bottom:26px">BOTANICAL REPORT</div>`);
+  const flash=el('div','',s);flash.id='s5flash';
+  S.s5={s,top,bot,tch:letters(top),bch:letters(bot),lily,ghosts,lens,lensL,trace,tl,tc:$('.tc',trace),tp:$('.tp',trace),flash};
+}
+function buildS6(){
+  const cam=$('#s6 .cam');
+  const w=el('div','disp wordW',cam,'STUDIES');w.style.left='0';w.style.width='1280px';w.style.textAlign='center';w.style.top='256px';w.style.fontSize='200px';
+  const ch=letters(w);
+  const sq=el('div','lens',cam);sq.style.background='#000';
+  const imgs=[lilySVG({pal:'red',seed:7,vb:'-52 -52 104 104',bg:'#070707'}),lilySVG({pal:'red',seed:19,vb:'-120 -120 240 240',bg:'#f0cfc9'}),lilySVG({pal:'red',seed:5,vb:'-80 -80 160 160',bg:'#e8e2e6'})].map(h=>{const d=el('div','',sq,h);d.style.cssText='position:absolute;inset:0';return d});
+  const xr=el('div','',sq);xr.style.cssText='position:absolute;inset:0;background:#000';
+  const x1=lilyEl(xr,lilySVG({pal:'xray',seed:23,stamens:true}),0,0,10);const x2=lilyEl(xr,lilySVG({pal:'xray',seed:31}),0,0,10);
+  x1.style.mixBlendMode=x2.style.mixBlendMode='screen';
+  imgs.push(xr);
+  const hs=[0,1,2,3].map(()=>el('div','hr',cam));
+  S.s6={cam,w,ch,sq,imgs,x1,x2,hs};
+}
+
+/* ============================ RENDER ============================ */
+const SCENES=[['s1',0,1.35],['s2',1.35,2.5],['s3',2.5,4.1],['s4a',4.1,4.75],['s4b',4.75,5.25],['s5',5.25,6.4],['s6',6.4,DUR+1]];
+const ctx=$('#fx').getContext('2d');
+
+function renderS1(t){
+  const s=S.s1,cam=1+.55*E.outCubic(P(t,0,1.35));
+  s.cam.style.transform=`scale(${cam})`;
+  s.gl.forEach((g,i)=>g.style.transform=`scaleX(${E.outExpo(P(t,.0+i*.05,.5+i*.05))})`);
+  s.gv.forEach((g,i)=>g.style.transform=`scaleY(${E.outExpo(P(t,.04+i*.04,.55+i*.04))})`);
+  const pc=E.outExpo(P(t,.08,.6));s.circ.style.transform=`rotate(${lerp(-120,0,pc)}deg) scale(${lerp(.55,1,pc)})`;s.circ.style.opacity=pc;
+  s.diag.style.opacity=P(t,.2,.45);
+  s.nodes.forEach((n,i)=>{const q=E.outBack(P(t,.12+i*.035,.36+i*.035));n.style.transform=`scale(${q})`});
+  // specimen grows in
+  const g=E.outExpo(P(t,0,.7));let jx=0;
+  if(t>.34&&t<.46)jx=(hash(Math.floor(t*30),3)-.5)*18;
+  const tr=`translate(${jx}px,${lerp(40,0,g)}px) scale(${lerp(.5,1,g)})`;
+  s.lily.style.transform=tr;s.lily.style.transformOrigin='100px 380px';
+  // inverted lens
+  const lp=E.outExpo(P(t,.8,.9));const lw=192*lp,lx=544+(192-lw)/2;
+  place(s.lens,lx,264,lw,193);show(s.lens,lp>0);
+  place(s.lily2,540-lx,150-264,200,380);s.lily2.style.transform=tr;s.lily2.style.transformOrigin='100px 380px';
+  // title
+  s.tch.forEach((c,i)=>{const q=E.outExpo(P(t,.42+i*.035,.8+i*.035));c.style.transform=`translateY(${lerp(115,0,q)}%)`});
+  const tq=E.outExpo(P(t,.62,.85));s.tag.style.clipPath=`inset(0 ${100-tq*100}% 0 0)`;
+  const n=Math.floor(s.specTxt.length*P(t,.5,.95));s.spec.textContent=s.specTxt.slice(0,n)+(n<s.specTxt.length&&n>0?'█':'');
+  // flash + pixel glitch
+  const flash=t>=.46&&t<.56;show($('#s1flash'),flash);
+  s.title.style.color=flash?'#0a0a0a':'';
+  const hx=640+(640-640)*cam,hy=360+(232-360)*cam;
+  if(t>.34&&t<.46)pixelLily(ctx,hx+jx*cam,hy,190*cam,{color:'#D71E28',alt:'#fff',p:P(t,.34,.42)*.8,squash:.5,seed:3,jitter:30,t});
+  if(flash)pixelLily(ctx,hx,hy-10,210*cam,{color:'#fff',p:.9,squash:.62,gap:.3,seed:5,jitter:14,t});
+}
+function renderS2(t){
+  const s=S.s2,{rot,sc}=s2Lily(t);
+  lilyXform(s.big,rot,sc);
+  s.s.style.filter=(t>1.98&&t<2.06)?'grayscale(1) contrast(1.15) brightness(1.05)':'';
+  s.lenses.forEach(({lens,inner,box,L})=>{const q=E.outExpo(P(t,L.t,L.t+.16)),h=L.h*q;const on=q>0;
+    show(lens,on);show(box,on);if(!on)return;
+    place(lens,L.x,L.y,L.w,h);place(box,L.x,L.y,L.w,h);
+    place(inner,S2L.x-L.x,S2L.y-L.y);lilyXform(inner,rot,sc)});
+  // sparkles + annotation boxes
+  const cx=640,cy=430,ra=rot*Math.PI/180,fr=Math.floor(t*30);
+  const pa=P(t,1.35,1.42)*(1-P(t,1.8,1.98));
+  if(pa>0)for(let i=0;i<s.parts.length;i++){const q=s.parts[i];if(hash(i,fr>>1,4)<.35)continue;
+    const d=q.d*sc*(1+.08*P(t,1.35,2)),x=cx+Math.cos(q.a+ra)*d,y=cy+Math.sin(q.a+ra)*d;
+    ctx.fillStyle=`rgba(255,255,255,${(.5+.5*q.k)*pa})`;ctx.fillRect(x,y,q.s,q.s)}
+  ctx.font='7px JB';ctx.lineWidth=1;
+  for(let i=0;i<s.boxes.length;i++){const b=s.boxes[i];if(t<b.a||t>b.a+b.d||t>2.1)continue;if(hash(i,fr>>1,9)<.22)continue;
+    ctx.strokeStyle='rgba(255,52,64,.95)';ctx.strokeRect(b.x+.5,b.y+.5,b.w,b.h);
+    ctx.beginPath();ctx.moveTo(b.x+b.w-7,b.y+3);ctx.lineTo(b.x+b.w-3,b.y+7);ctx.moveTo(b.x+b.w-3,b.y+3);ctx.lineTo(b.x+b.w-7,b.y+7);ctx.stroke();
+    if(b.lab){ctx.fillStyle='rgba(255,255,255,.85)';ctx.fillText(`x${(b.v*.9+.05).toFixed(2)}`,b.x+2,b.y-3)}}
+  // pixel mask wipe → red
+  const ex=LENS;
+  if(t>2.1)pixelWipe(ctx,E.inOutCubic(P(t,2.1,2.34)),{cell:16,seed:12,mode:'white',exclude:ex});
+  if(t>2.26)pixelWipe(ctx,E.inCubic(P(t,2.26,2.5))*1.02,{cell:16,seed:21,mode:'red',exclude:ex});
+}
+const lerpR=(a,b,q)=>({x:lerp(a.x,b.x,q),y:lerp(a.y,b.y,q),w:lerp(a.w,b.w,q),h:lerp(a.h,b.h,q)});
+function renderS3(t){
+  const s=S.s3,{rot,sc}=s2Lily(2.5);
+  s.guides.style.opacity=E.outCubic(P(t,2.5,2.75));
+  const R=[];
+  s.cards.forEach((c,k)=>{
+    const L=c.c.from>=0?LENS[c.c.from]:null,A=LAY_A[k],B=LAY_B[k];
+    let r=L?{...L}:{x:A.x+A.w/2,y:A.y+A.h/2,w:0,h:0};
+    r=lerpR(r,A,E.inOutExpo(P(t,2.6+k*.025,2.95+k*.025)));
+    r=lerpR(r,B,E.inOutExpo(P(t,3.02+k*.02,3.36+k*.02)));
+    R.push(r);
+    place(c.e,r.x,r.y,r.w,r.h);
+    const x=P(t,2.66+k*.03,2.8+k*.03);c.part.style.opacity=x;c.blue.style.opacity=1-x;
+    if(L){place(c.bl,S2L.x-L.x,S2L.y-L.y);lilyXform(c.bl,rot,sc)}
+    c.lbl.textContent=t<2.72+k*.03?(L?L.n:''):c.c.n;
+    // letters take over
+    const T=k===0?3.94:BLOOM[k-1].t,col=E.outExpo(P(t,T-.02,T+.14));
+    c.img.style.clipPath=`inset(${col*100}% 0 0 0)`;
+    const vis=col<1;c.lbl.style.opacity=vis&&(L||t>2.7)?1:0;c.hs.forEach((h,i)=>{h.style.opacity=vis&&r.w>2?1:0;h.style.left=(i%2?r.w:0)+'px';h.style.top=(i<2?0:r.h)+'px'});
+  });
+  // arcs from the bud to the other specimens
+  const ap=E.outCubic(P(t,2.8,3.15))*(1-P(t,3.75,3.95));
+  const b0=R[0];
+  s.arcs.forEach((a,i)=>{const k=1+(i%4),r=R[k],tx=i<4?r.x:r.x+r.w,ty=r.y+r.h,sx=b0.x,sy=b0.y+b0.h;
+    const d=`M${sx} ${sy}Q${(sx+tx)/2} ${Math.max(sy,ty)+70+i*22} ${tx} ${ty}`;a.setAttribute('d',d);
+    const len=a.getTotalLength();a.style.strokeDasharray=len;a.style.strokeDashoffset=len*(1-ap);a.style.opacity=i<4||k<3?1:0});
+  s.letters.forEach((e,i)=>{const T=BLOOM[i].t,q=E.outExpo(P(t,T,T+.22));e.style.opacity=q>0?1:0;e.style.transform=`translateY(${lerp(38,0,q)}px)`;e.style.clipPath=`inset(0 0 ${(1-q)*100}% 0)`});
+}
+function renderS4a(t){
+  const s=S.s4a,fin=[[0,0],[0,0],[0,0],[0,0],[-6,0],[-20,-5],[-30,9],[-10,3]];
+  s.ch.forEach((c,i)=>{const r=rng(i*7+1),T=4.1+[2,0,0,1,3,5,4,6][i]*.035,q=E.outBack(P(t,T,T+.42));
+    const y0=(r()-.5)*170,a0=(r()-.5)*40;c.style.opacity=t>=T?1:0;
+    c.style.transform=`translateY(${lerp(y0,fin[i][0],q)}px) rotate(${lerp(a0,fin[i][1],q)}deg)`});
+}
+function renderS4b(t){
+  const p=P(t,4.75,5.25),x=lerp(60,-2350,E.inExpo(p)*.82+p*.18),s=lerp(.78,2.5,E.inOutCubic(p));
+  S.s4b.row.style.transform=`translateX(${x}px) scale(${s})`;
+}
+function renderS5(t){
+  const s=S.s5,p=P(t,5.25,6.4);
+  // words drift in opposite directions
+  s.top.style.left=lerp(760,300,E.outCubic(p))+'px';
+  s.bot.style.left=lerp(-560,-70,E.outCubic(p))+'px';
+  const broken=t>=5.95;
+  const bq=E.outExpo(P(t,5.95,6.3));
+  s.tch.forEach((c,i)=>{const hide=broken&&(i===2||i===5)&&hash(i,Math.floor(t*20))<.8;c.style.opacity=hide?0:1;c.style.transform=`translate(${(i-2.5)*60*bq}px,${broken?(hash(i,1)-.5)*40*bq:0}px)`});
+  s.bch.forEach((c,i)=>{const hide=broken&&(i===3||i===4)&&hash(i,Math.floor(t*20)+3)<.8;c.style.opacity=hide?0:1;c.style.transform=`translate(${(i-3.5)*45*bq}px,${broken?(hash(i,2)-.5)*40*bq:0}px)`});
+  // lily
+  const g=E.outBack(P(t,5.25,5.6));
+  const spin=broken?E.inOutCubic(P(t,5.95,6.4))*240:0;
+  const rot=lerp(-40,20,E.outCubic(p))+spin,sc=lerp(.55,1,g)*(broken?lerp(1,1.08,bq):1);
+  lilyXform(s.lily,rot,sc);
+  s.ghosts.forEach((gh,i)=>{show(gh,broken);lilyXform(gh,rot-(i+1)*9,sc);gh.style.opacity=.45/(i+1)});
+  show(s.lens,broken);
+  if(broken){const ls=E.outExpo(P(t,5.97,6.08))*150;place(s.lens,640-ls/2,400-ls/2,ls,ls);place(s.lensL,S5L.x-(640-ls/2),S5L.y-(400-ls/2));lilyXform(s.lensL,rot,sc*1.25)}
+  // geometric trace
+  const tr=t>=5.62&&t<5.88;show(s.trace,tr);
+  if(tr){const q=P(t,5.62,5.88);lilyXform(s.tl,lerp(-14,6,E.outCubic(q)),lerp(.94,1.02,q));s.tc.setAttribute('stroke-dashoffset',1300*(1-E.outCubic(P(t,5.62,5.8))));s.tp.style.opacity=P(t,5.68,5.72)}
+  const fl=t>=5.88&&t<5.95;show(s.flash,fl);
+  if(fl)pixelLily(ctx,640,360,560,{color:'#a90f19',p:1,gap:.35,seed:8});
+  if(t>=5.95&&t<6.02)pixelLily(ctx,640,400,520*sc,{color:'#E3202C',p:1,gap:0,seed:9,jitter:40,t});
+}
+function renderS6(t){
+  const s=S.s6;
+  const open=E.outExpo(P(t,6.42,6.72)),grow=E.inOutExpo(P(t,7.15,7.6));
+  const side=lerp(0,190,open)+lerp(0,110,grow),hgt=lerp(0,190,E.outExpo(P(t,6.45,6.7)))+lerp(0,110,grow);
+  const cam=lerp(1,1.75,grow);s.cam.style.transform=`scale(${cam})`;
+  // split word around the square: STU | DIES
+  s.ch.forEach((c,i)=>{const dir=i<3?-1:1,r=rng(i*3+5),T=6.4+i*.03,q=E.outExpo(P(t,T,T+.4));
+    c.style.transform=`translate(${dir*(side/2+14*open)}px,${lerp((r()-.5)*240,0,q)}px)`;c.style.opacity=t>=T?1:0});
+  place(s.sq,640-side/2,358-hgt/2,side,hgt);
+  const idx=t<6.78?0:t<6.98?1:t<7.14?2:3;s.imgs.forEach((d,i)=>show(d,i===idx));
+  if(idx===3){const q=P(t,7.14,7.8),z=Math.max(side,hgt)*1.35;
+    place(s.x1,side/2-z/2-z*.12,hgt/2-z/2+z*.08,z,z);lilyXform(s.x1,lerp(-20,-5,q),lerp(.9,1.05,q));
+    place(s.x2,side/2-z/2+z*.2,hgt/2-z/2-z*.14,z*.8,z*.8);lilyXform(s.x2,lerp(30,44,q),1)}
+  const corners=[[-1,-1],[1,-1],[-1,1],[1,1]];
+  s.hs.forEach((h,i)=>{h.style.left=640+corners[i][0]*side/2+'px';h.style.top=358+corners[i][1]*hgt/2+'px';h.style.opacity=side>4&&t<7.2?1:0});
+}
+const RENDER={s1:renderS1,s2:renderS2,s3:renderS3,s4a:renderS4a,s4b:renderS4b,s5:renderS5,s6:renderS6};
+function render(t){
+  ctx.clearRect(0,0,W,H);
+  for(const [id,a,b] of SCENES){const on=t>=a&&t<b;show($('#'+id),on);if(on)RENDER[id](t)}
+}
+
+/* ============================ BOOT ============================ */
+const isRender=new URLSearchParams(location.search).has('render');
+if(isRender)document.body.classList.add('render');
+function fit(){if(isRender)return;const v=$('#viewport'),k=Math.min(v.clientWidth/W,v.clientHeight/H);
+  const st=$('#stage');st.style.transform=`scale(${k})`;st.style.left=(v.clientWidth-W*k)/2+'px';st.style.top=(v.clientHeight-H*k)/2+'px'}
+window.addEventListener('resize',fit);
+window.__DUR=DUR;window.__render=render;
+(async()=>{
+  buildS1();buildS2();buildS3();buildS4();buildS5();buildS6();
+  await Promise.all([document.fonts.load('500 100px Archivo'),document.fonts.load('10px JB'),buildRaster()]);
+  await document.fonts.ready;
+  fit();render(0);window.__ready=true;
+  if(isRender)return;
+  let playing=true,t0=performance.now(),cur=0;
+  const btn=$('#play'),scrub=$('#scrub'),lbl=$('#time');
+  const set=t=>{cur=t;render(t);scrub.value=t/DUR;lbl.textContent=t.toFixed(2)+'s'};
+  const loop=now=>{if(playing)set(((now-t0)/1000)%DUR);requestAnimationFrame(loop)};requestAnimationFrame(loop);
+  const toggle=()=>{playing=!playing;btn.textContent=playing?'❚❚':'▶';if(playing)t0=performance.now()-cur*1000};
+  btn.onclick=toggle;
+  scrub.oninput=()=>{playing=false;btn.textContent='▶';set(scrub.value*DUR)};
+  addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();toggle()}
+    if(e.code==='ArrowRight'||e.code==='ArrowLeft'){playing=false;btn.textContent='▶';set(clamp(cur+(e.code==='ArrowRight'?1:-1)/FPS,0,DUR-1/FPS))}});
+})();
+</script>
+</body>
+</html>
