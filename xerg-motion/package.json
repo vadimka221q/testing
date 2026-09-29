@@ -1,0 +1,10 @@
+{
+  "name": "xerg-motion",
+  "private": true,
+  "description": "xerg brand identity reel (Sollas) — HTML/JS motion, rendered to MP4 with Playwright + ffmpeg",
+  "scripts": {
+    "assets": "node build-assets.cjs",
+    "render": "node build-assets.cjs && node render.cjs"
+  },
+  "devDependencies": { "playwright": "1.56.1" }
+}
