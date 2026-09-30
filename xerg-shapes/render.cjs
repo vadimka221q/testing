@@ -1,6 +1,6 @@
 // Renders index.html frame-by-frame into an MP4.
-//   node render.cjs                      -> out/xerg-shapes.mp4 (1080x1080, 30fps)
-//   node render.cjs --scale 1            -> 720x720
+//   node render.cjs                      -> out/xerg-shapes.mp4 (1920x1080, 30fps)
+//   node render.cjs --scale 1            -> 1280x720
 //   node render.cjs --stills 0.5,1.6,3   -> PNG stills into out/stills/
 // Requires: playwright (npm i) and ffmpeg on PATH (or FFMPEG=/path/to/ffmpeg).
 const { chromium } = require('playwright');
@@ -18,11 +18,11 @@ const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
-  const page = await browser.newPage({ viewport: { width: 720, height: 720 }, deviceScaleFactor: SCALE });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: SCALE });
   page.on('pageerror', e => console.error('page error:', e.message));
   await page.goto('file://' + path.resolve(__dirname, 'index.html') + '?render');
   await page.waitForFunction(() => window.__ready === true);
-  const clip = { x: 0, y: 0, width: 720, height: 720 };
+  const clip = { x: 0, y: 0, width: 1280, height: 720 };
 
   if (STILLS) {
     const dir = path.resolve(__dirname, 'out/stills');
