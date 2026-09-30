@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>xerg Shapes Loop</title>
+<style>
+@font-face{font-family:'Space Mono';src:url(../xerg-motion/fonts/spacemono.woff2) format('woff2');font-weight:400;font-display:block}
+:root{--black:#0C0C0C;--jade:#2AB36C;--mint:#F4FFF7}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#050505;overflow:hidden}
+#viewport{position:fixed;left:0;right:0;top:0;bottom:64px;display:grid;place-items:center}
+#c{display:block;width:720px;height:720px}
+body.render #viewport{bottom:0;place-items:start}
+body.render #bar{display:none}
+#bar{position:fixed;left:0;right:0;bottom:0;height:64px;display:flex;align-items:center;gap:14px;padding:0 20px;background:#0a0a0a;border-top:1px solid #1f1f1f;font:12px 'Space Mono',monospace;color:#9aa39d}
+#bar button{all:unset;cursor:pointer;width:34px;height:34px;display:grid;place-items:center;border:1px solid #333;border-radius:50%;color:#fff}
+#bar button:hover{border-color:var(--jade)}
+#bar input{flex:1;accent-color:var(--jade)}
+</style>
+<script src="../xerg-motion/assets/assets.js"></script>
+</head>
+<body>
+<div id="viewport"><canvas id="c"></canvas></div>
+<div id="bar">
+  <button id="play" aria-label="Play / pause">❚❚</button>
+  <span id="time">0.00s</span>
+  <input id="scrub" type="range" min="0" max="1" step="0.0001" value="0" aria-label="Timeline">
+  <span style="color:#F4FFF7;letter-spacing:.08em">XERG · SHAPES</span>
+</div>
+<script>
+/* ============================================================
+   xerg — grainy shapes loop (1:1)
+   A pure function of time: render(t) draws the whole frame on one canvas.
+   ============================================================ */
+const S=720,FPS=30,DUR=6.2;
+const C={black:'#0C0C0C',nero:'#262626',scar:'#404040',zinc:'#5a5a5a',deep:'#0f1d16',forest:'#124D2F',cam:'#196f43',vegan:'#219359',jade:'#2AB36C',dragon:'#54c38a',pjade:'#7ED3A8',mint:'#F4FFF7'};
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const P=(t,a,b)=>clamp((t-a)/(b-a));
+const E={
+  outExpo:x=>x>=1?1:1-Math.pow(2,-10*x),
+  inExpo:x=>x<=0?0:Math.pow(2,10*x-10),
+  inOutExpo:x=>x<=0?0:x>=1?1:x<.5?Math.pow(2,20*x-10)/2:(2-Math.pow(2,-20*x+10))/2,
+  outCubic:x=>1-Math.pow(1-x,3),
+  inCubic:x=>x*x*x,
+  inOutCubic:x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2,
+  outBack:x=>{const c1=1.7,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)},
+};
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hash(a,b=0,c=0){let h=Math.imul((a|0)^0x9e3779b9,0x85ebca6b)^Math.imul((b|0)+0x632be5ab,0xc2b2ae35)^Math.imul((c|0)+0x27d4eb2f,0x165667b1);h^=h>>>15;h=Math.imul(h,0x2c1b3c6d);h^=h>>>12;h=Math.imul(h,0x297a2d39);h^=h>>>15;return (h>>>0)/4294967296}
+const $=s=>document.querySelector(s);
+const cv=$('#c'),DPR=window.devicePixelRatio||1;cv.width=cv.height=Math.round(S*DPR);
+const ctx=cv.getContext('2d');
+
+/* ---------------- grainy gradient textures ---------------- */
+const hex=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+function rampAt(st,t){const n=st.length-1,x=t*n,i=Math.min(n-1,Math.floor(x)),f=x-i,a=st[i],b=st[i+1];return [a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f]}
+// Paint a shape (path in local px, 0..w × 0..h) with a stippled gradient — the "grain" look.
+function tex({w,h,path,grad={type:'lin',a:0},ramp,grain=.3,seed=1}){
+  const Wp=Math.ceil(w*DPR),Hp=Math.ceil(h*DPR),m=document.createElement('canvas');m.width=Wp;m.height=Hp;
+  const mc=m.getContext('2d');mc.scale(DPR,DPR);mc.fillStyle='#fff';mc.beginPath();path(mc,w,h);mc.fill();
+  const id=mc.getImageData(0,0,Wp,Hp),d=id.data,r=rng(seed),st=ramp.map(hex);
+  const ca=Math.cos(grad.a*Math.PI/180),sa=Math.sin(grad.a*Math.PI/180),half=(Math.abs(w*ca)+Math.abs(h*sa))/2;
+  for(let y=0;y<Hp;y++)for(let x=0;x<Wp;x++){const i=(y*Wp+x)*4,al=d[i+3];if(!al)continue;
+    const px=x/DPR,py=y/DPR;let t;
+    if(grad.type==='rad')t=Math.hypot(px-grad.cx*w,py-grad.cy*h)/(grad.r*Math.max(w,h));
+    else t=((px-w/2)*ca+(py-h/2)*sa)/half*.5+.5;
+    t=clamp(t+(r()+r()-1)*grain);
+    const c=rampAt(st,t);d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];
+    if(al<255)d[i+3]=r()*255<al?255:0;
+  }
+  mc.setTransform(1,0,0,1,0,0);mc.putImageData(id,0,0);m.w=w;m.h=h;return m;
+}
+const rect=(c,w,h)=>c.rect(0,0,w,h);
+const circ=(c,w,h)=>c.ellipse(w/2,h/2,w/2,h/2,0,0,Math.PI*2);
+const poly=pts=>(c,w,h)=>{c.moveTo(pts[0][0]*w,pts[0][1]*h);pts.slice(1).forEach(p=>c.lineTo(p[0]*w,p[1]*h));c.closePath()};
+function starPts(n,inner,seed){const r=rng(seed),pts=[];for(let i=0;i<n*2;i++){const a=i/(n*2)*Math.PI*2-Math.PI/2,R=i%2?inner*(.85+r()*.3):(.82+r()*.18);pts.push([.5+Math.cos(a)*R/2,.5+Math.sin(a)*R/2])}return pts}
+const bean=(c,w,h)=>{c.ellipse(w*.5,h*.28,w*.42,h*.26,.3,0,Math.PI*2);c.moveTo(w*.9,h*.62);c.ellipse(w*.5,h*.66,w*.4,h*.3,-.2,0,Math.PI*2)};
+// the xerg mark as two faces (from the logo geometry)
+const TRI_L=poly([[.5,0],[0,1],[.5,1]]),TRI_R=poly([[.5,0],[1,1],[.5,1]]);
+
+/* ---------------- scene data ---------------- */
+let T={};
+// A — window with sliding grain bars (window rect + bars in window-local px)
+const LAYOUTS=[
+  {t:[0,.36],win:{x:115,y:228,w:490,h:265},bars:[
+    {x:0,y:0,w:490,h:12,ramp:[C.pjade,C.jade],dx:-1},
+    {x:43,y:44,w:447,h:56,ramp:[C.mint,C.pjade,C.jade,C.cam],dx:1},
+    {x:0,y:138,w:316,h:55,ramp:[C.zinc,C.pjade,C.mint],dx:-1},
+    {x:227,y:229,w:263,h:36,ramp:[C.cam,C.jade,C.dragon],dx:1}]},
+  {t:[.36,.68],win:{x:188,y:262,w:344,h:196},bars:[
+    {x:0,y:0,w:148,h:38,ramp:[C.mint,C.dragon],dx:-1},
+    {x:86,y:70,w:258,h:40,ramp:[C.jade,C.pjade,C.jade],dx:1},
+    {x:214,y:136,w:130,h:36,ramp:[C.pjade,C.mint],dx:1}]},
+  {t:[.68,1.02],win:{x:118,y:212,w:484,h:296},bars:[
+    {x:0,y:34,w:236,h:46,ramp:[C.jade,C.mint,C.dragon],dx:-1},
+    {x:70,y:120,w:414,h:44,ramp:[C.forest,C.jade,C.mint,C.pjade],dx:1},
+    {x:0,y:206,w:320,h:48,ramp:[C.mint,C.zinc,C.jade],dx:-1}]},
+];
+// B — the burst. x,y relative to cluster centre; drawn in this order.
+const SH=[
+  {k:'circle',x:-190,y:110,w:300,h:300,rot:0,path:circ,grad:{type:'rad',cx:.3,cy:.25,r:.95},ramp:[C.mint,C.pjade,C.jade,C.cam,C.deep]},
+  {k:'hex',x:-110,y:210,w:230,h:170,rot:-12,path:poly([[.18,0],[.82,.06],[1,.55],[.8,1],[.12,.9],[0,.4]]),grad:{type:'lin',a:40},ramp:[C.mint,C.zinc,C.nero,C.black]},
+  {k:'square',x:80,y:-150,w:200,h:200,rot:18,path:rect,grad:{type:'lin',a:90},ramp:[C.cam,C.jade,C.pjade,C.mint]},
+  {k:'bar',x:40,y:40,w:280,h:26,rot:-26,path:rect,grad:{type:'lin',a:0},ramp:[C.jade,C.mint]},
+  {k:'bar',x:-30,y:-20,w:210,h:20,rot:38,path:rect,grad:{type:'lin',a:0},ramp:[C.scar,C.pjade,C.mint]},
+  {k:'bar',x:150,y:-20,w:170,h:18,rot:-14,path:rect,grad:{type:'lin',a:0},ramp:[C.cam,C.dragon]},
+  {k:'bar',x:-60,y:130,w:28,h:150,rot:22,path:rect,grad:{type:'lin',a:90},ramp:[C.dragon,C.deep]},
+  {k:'bar',x:210,y:-80,w:22,h:130,rot:-32,path:rect,grad:{type:'lin',a:90},ramp:[C.mint,C.jade]},
+  {k:'star',x:130,y:170,w:500,h:500,rot:8,path:poly(starPts(9,.42,4)),grad:{type:'rad',cx:.38,cy:.35,r:.62},ramp:[C.mint,C.mint,C.pjade,C.jade,C.cam]},
+  {k:'bean',x:-150,y:-175,w:150,h:260,rot:-12,path:bean,grad:{type:'lin',a:70},ramp:[C.pjade,C.mint,C.dragon]},
+  {k:'bean',x:-40,y:250,w:64,h:84,rot:30,path:bean,grad:{type:'lin',a:0},ramp:[C.mint,C.pjade]},
+  {k:'star',x:-230,y:-40,w:120,h:120,rot:0,path:poly(starPts(6,.5,9)),grad:{type:'rad',cx:.5,cy:.5,r:.55},ramp:[C.mint,C.dragon,C.cam]},
+  {k:'mark',x:-190,y:125,w:74,h:57,rot:-8},
+  {k:'mark',x:200,y:-10,w:64,h:49,rot:14},
+  {k:'mark',x:-50,y:-70,w:52,h:40,rot:-20},
+  {k:'mark',x:60,y:250,w:60,h:46,rot:10},
+];
+const ORB=[{x:-120,y:-90,rx:210,ry:62,rot:-16,sp:.9},{x:90,y:120,rx:250,ry:84,rot:12,sp:-.7}];
+const SPARK=[[260,-220,16],[-290,250,12],[240,270,14],[-60,-300,10]];
+function build(){
+  LAYOUTS.forEach((L,li)=>L.bars.forEach((b,bi)=>b.tex=tex({w:b.w,h:b.h,path:rect,grad:{type:'lin',a:0},ramp:b.ramp,grain:.28,seed:li*10+bi+1})));
+  SH.forEach((s,i)=>{
+    if(s.k==='mark'){s.tl=tex({w:s.w,h:s.h,path:TRI_L,grad:{type:'lin',a:0},ramp:[C.jade,C.cam],grain:.2,seed:i});s.tr=tex({w:s.w,h:s.h,path:TRI_R,grad:{type:'lin',a:60},ramp:[C.mint,C.dragon,C.cam],grain:.2,seed:i+50});return}
+    s.tex=tex({w:s.w,h:s.h,path:s.path,grad:s.grad,ramp:s.ramp,grain:.3,seed:i+7});
+  });
+  T.bigMark=[tex({w:209.2,h:160,path:TRI_L,grad:{type:'lin',a:0},ramp:[C.jade,C.forest],grain:.16,seed:91}),tex({w:209.2,h:160,path:TRI_R,grad:{type:'lin',a:55},ramp:[C.jade,C.deep],grain:.16,seed:92})];
+  // animated film grain
+  T.grain=[0,1,2,3].map(k=>{const g=document.createElement('canvas');g.width=g.height=Math.round(S*DPR);const gc=g.getContext('2d'),id=gc.createImageData(g.width,g.height),d=id.data,r=rng(300+k);
+    for(let i=0;i<d.length;i+=4){const v=r()*255;d[i]=d[i+1]=d[i+2]=v;d[i+3]=22}gc.putImageData(id,0,0);return g});
+  const doc=new DOMParser().parseFromString(ASSETS.logo,'image/svg+xml');T.logo=[...doc.querySelectorAll('path')].map(p=>new Path2D(p.getAttribute('d')));
+}
+function drawTex(tx,x,y,rot=0,sc=1,alpha=1){if(sc<=.001||alpha<=0)return;ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);ctx.rotate(rot*Math.PI/180);ctx.scale(sc,sc);ctx.drawImage(tx,-tx.w/2,-tx.h/2,tx.w,tx.h);ctx.restore()}
+function sparkle(x,y,s,a){ctx.save();ctx.globalAlpha=a;ctx.fillStyle=C.mint;ctx.beginPath();ctx.moveTo(x,y-s);ctx.quadraticCurveTo(x,y,x+s*.35,y);ctx.quadraticCurveTo(x,y,x,y+s);ctx.quadraticCurveTo(x,y,x-s*.35,y);ctx.quadraticCurveTo(x,y,x,y-s);ctx.fill();ctx.restore()}
+function line(x1,y1,x2,y2,p,w=1.5,col='rgba(244,255,247,.92)'){if(p<=0)return;ctx.strokeStyle=col;ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(lerp(x1,x2,p),lerp(y1,y2,p));ctx.stroke()}
+
+/* ============================ SCENES ============================ */
+function sceneA(t){
+  ctx.fillStyle=C.mint;ctx.fillRect(0,0,S,S);
+  const L=LAYOUTS.find(l=>t>=l.t[0]&&t<l.t[1])||LAYOUTS[2],lt=t-L.t[0],w=L.win;
+  const grow=L===LAYOUTS[2]?E.inCubic(P(t,.84,1.02)):0;
+  const wx=w.x-w.w*.08*grow,wy=w.y-w.h*.08*grow,ww=w.w*(1+.16*grow),wh=w.h*(1+.16*grow);
+  ctx.fillStyle=C.black;ctx.fillRect(wx,wy,ww,wh);
+  ctx.save();ctx.beginPath();ctx.rect(wx,wy,ww,wh);ctx.clip();
+  L.bars.forEach((b,i)=>{const q=E.outExpo(P(lt,i*.03,.3+i*.03)),drift=lt*40*b.dx;
+    const x=wx+(b.x+b.w/2)*ww/w.w+b.dx*(1-q)*w.w*.9+drift,y=wy+(b.y+b.h/2)*wh/w.h;
+    const tilt=grow*(i%2?-9:12);ctx.save();ctx.translate(x,y);ctx.rotate(tilt*Math.PI/180);ctx.drawImage(b.tex,-b.w/2*ww/w.w,-b.h/2*wh/w.h,b.w*ww/w.w,b.h*wh/w.h);ctx.restore()});
+  ctx.restore();
+}
+function clusterXf(t){
+  const zoom=1+3.4*E.inCubic(P(t,2.45,3.45));
+  const s=lerp(.5,.86,E.outCubic(P(t,1.02,2.4)))*zoom,rot=lerp(-14,10,P(t,1.02,3.45));
+  const F={x:-170,y:150},k=(zoom-1)/zoom;   // zoom toward the big circle
+  return {cx:360-F.x*s*k*.9,cy:380-F.y*s*k*.6,s,rot};
+}
+function toScreen(xf,x,y){const a=xf.rot*Math.PI/180,c=Math.cos(a),sn=Math.sin(a);return [xf.cx+(x*c-y*sn)*xf.s,xf.cy+(x*sn+y*c)*xf.s]}
+function sceneB(t){
+  ctx.fillStyle='#0a0c0b';ctx.fillRect(0,0,S,S);
+  const xf=clusterXf(t),zoom=xf.s;
+  // soft tunnel rings
+  for(let k=0;k<4;k++){const r=(120+k*170)*(1+.35*P(t,1.02,2.4))*(1+2.6*E.inCubic(P(t,2.45,3.45)));
+    const g=ctx.createRadialGradient(360,380,Math.max(0,r-46),360,380,r+46);g.addColorStop(0,'rgba(84,195,138,0)');g.addColorStop(.5,'rgba(126,211,168,.085)');g.addColorStop(1,'rgba(84,195,138,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,S,S)}
+  SH.forEach((s,i)=>{const d=i*.018,T0=1.02+d,q=E.outExpo(P(t,T0,T0+.6)),sc=E.outBack(P(t,T0,T0+.5));
+    if(t<T0)return;
+    const fl=Math.sin(t*1.6+i*1.7)*6*q,sx=lerp(s.x*.12,s.x,q)+fl,sy=lerp(s.y*.12-20,s.y,q)+Math.cos(t*1.3+i)*5*q;
+    const [x,y]=toScreen(xf,sx,sy),rot=s.rot+xf.rot+(1-q)*140+Math.sin(t*.9+i)*3;
+    if(s.k==='mark'){drawTex(s.tl,x,y,rot,sc*xf.s);drawTex(s.tr,x,y,rot,sc*xf.s);return}
+    drawTex(s.tex,x,y,rot,lerp(.2,1,sc)*xf.s);
+  });
+  // orbit lines
+  ctx.lineWidth=1.6;ctx.strokeStyle='rgba(244,255,247,.9)';
+  ORB.forEach((o,i)=>{const q=E.outCubic(P(t,1.25+i*.12,1.9+i*.12));if(q<=0)return;const [x,y]=toScreen(xf,o.x,o.y);
+    const a0=t*o.sp;ctx.beginPath();ctx.ellipse(x,y,o.rx*xf.s,o.ry*xf.s,(o.rot+xf.rot)*Math.PI/180,a0,a0+Math.PI*2*.78*q);ctx.stroke()});
+  SPARK.forEach(([sx,sy,sz],i)=>{const [x,y]=toScreen(xf,sx,sy),a=P(t,1.5+i*.1,1.6+i*.1)*(.55+.45*Math.sin(t*9+i*2));sparkle(x,y,sz,a)});
+}
+function sceneC(t){
+  ctx.fillStyle='#0a0c0b';ctx.fillRect(0,0,S,S);
+  // construction lines
+  const c1=E.outExpo(P(t,3.45,3.75)),fade=1-P(t,3.8,3.95);
+  ctx.globalAlpha=fade;
+  line(360,0,360,600,c1);line(0,360,520,360,E.outExpo(P(t,3.5,3.8)));line(90,610,720,610,E.outExpo(P(t,3.55,3.85)));
+  ctx.globalAlpha=1;
+  // grid densifying toward the 64px brand module
+  const gp=P(t,3.72,4.7);if(gp<=0)return;
+  const sp=lerp(240,64,E.outCubic(gp)),dim=lerp(.92,.3,P(t,4.85,5.15));
+  const col=`rgba(244,255,247,${dim})`;
+  for(let k=-8;k<=8;k++){const q=E.outExpo(P(t,3.72+Math.abs(k)*.045,4.1+Math.abs(k)*.045));const p=360+k*sp;if(p<-2||p>S+2)continue;
+    line(p,0,p,S,q,1.4,col);line(0,p,S,p,q,1.4,col)}
+  return sp;
+}
+function sceneD(t){
+  sceneC(t);
+  const sp=64,ox=360-sp*5,oy=360-sp*5;   // grid origin (aligned with sceneC at sp=64)
+  // flickering cells — the brand grid carrying state
+  if(t<5.35)for(let i=0;i<12;i++){const r=rng(i+11),cx=Math.floor(r()*11),cy=Math.floor(r()*11);if(hash(i,Math.floor(t*12))<.45)continue;
+    ctx.fillStyle=r()<.6?C.jade:C.nero;ctx.fillRect(ox+cx*sp+1,oy+cy*sp+1,sp-2,sp-2)}
+  // the mark, built from grid cells, row by row
+  const rows=4,cellP=[];for(let j=0;j<rows;j++)for(let i=-(j+1);i<=j;i++)cellP.push([i,j]);
+  const build=P(t,5.0,5.35),out=E.inExpo(P(t,5.45,5.62));
+  cellP.forEach(([i,j],n)=>{const on=build*rows>j+(i+j+1)/(2*j+2)*.9;if(!on)return;
+    const x=360+i*sp,y=360+(j-2)*sp;ctx.fillStyle=i<-1?C.jade:i>0?C.cam:i===-1?C.dragon:C.vegan;const g=(1-out)*(sp-2);ctx.globalAlpha=1-out*.6;
+    ctx.fillRect(x+1+(sp-2-g)/2,y+1+(sp-2-g)/2,g,g);ctx.globalAlpha=1});
+  // vector lockup
+  const lq=E.outExpo(P(t,5.5,5.9));if(lq<=0)return;
+  const k=.62,lw=737*k,lx=360-lw/2,ly=360-198*k/2+8;
+  ctx.fillStyle='rgba(10,12,11,.82)';ctx.fillRect(0,0,S,S*lq);
+  ctx.save();ctx.translate(lx,ly+lerp(24,0,lq));ctx.scale(k,k);
+  ctx.beginPath();ctx.rect(0,-20,737,240*lq);ctx.clip();
+  ctx.drawImage(T.bigMark[0],0,0,209.2,160);ctx.drawImage(T.bigMark[1],0,0,209.2,160);
+  ctx.fillStyle=C.mint;for(let i=2;i<6;i++){const gq=E.outExpo(P(t,5.56+i*.04,5.9+i*.04));ctx.save();ctx.translate(0,lerp(40,0,gq));ctx.globalAlpha=gq;ctx.fill(T.logo[i],'evenodd');ctx.restore()}
+  ctx.restore();
+  // reticle brackets closing in
+  const bq=E.outExpo(P(t,5.55,6.0)),pad=36,bx=lerp(40,lx-pad,bq),by=lerp(40,ly-pad,bq),bw=lerp(640,lw+pad*2,bq),bh=lerp(640,198*k+pad*2,bq);
+  ctx.strokeStyle=C.mint;ctx.fillStyle=C.mint;ctx.lineWidth=2;const L=18;
+  [[bx,by,1,1],[bx+bw,by,-1,1],[bx,by+bh,1,-1],[bx+bw,by+bh,-1,-1]].forEach(([x,y,dx,dy])=>{ctx.beginPath();ctx.moveTo(x+dx*L,y);ctx.lineTo(x,y);ctx.lineTo(x,y+dy*L);ctx.stroke();ctx.fillRect(x-4,y-4,8,8)});
+  ctx.font='9px "Space Mono"';ctx.fillStyle=`rgba(207,216,210,${P(t,5.8,5.95)})`;ctx.textAlign='left';ctx.fillText('XERG.AI',28,34);ctx.textAlign='right';ctx.fillText('DESIGN — SOLLAS',S-28,S-26);ctx.textAlign='left';
+}
+function render(t){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  if(t<1.02)sceneA(t);else if(t<3.45)sceneB(t);else if(t<4.85)sceneC(t);else sceneD(t);
+  ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(T.grain[Math.floor(t*15)%4],0,0);
+}
+
+/* ============================ BOOT ============================ */
+const isRender=new URLSearchParams(location.search).has('render');
+if(isRender)document.body.classList.add('render');
+window.__DUR=DUR;window.__render=render;
+(async()=>{
+  await document.fonts.load('9px "Space Mono"');build();render(0);window.__ready=true;
+  if(isRender)return;
+  let playing=true,t0=performance.now(),cur=0;const btn=$('#play'),scrub=$('#scrub'),lbl=$('#time');
+  const set=t=>{cur=t;render(t);scrub.value=t/DUR;lbl.textContent=t.toFixed(2)+'s'};
+  const loop=now=>{if(playing)set(((now-t0)/1000)%DUR);requestAnimationFrame(loop)};requestAnimationFrame(loop);
+  const toggle=()=>{playing=!playing;btn.textContent=playing?'❚❚':'▶';if(playing)t0=performance.now()-cur*1000};
+  btn.onclick=toggle;scrub.oninput=()=>{playing=false;btn.textContent='▶';set(scrub.value*DUR)};
+  addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();toggle()}
+    if(e.code==='ArrowRight'||e.code==='ArrowLeft'){playing=false;btn.textContent='▶';set(clamp(cur+(e.code==='ArrowRight'?1:-1)/FPS,0,DUR-1/FPS))}});
+})();
+</script>
+</body>
+</html>
